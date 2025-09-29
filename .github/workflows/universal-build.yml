@@ -1,0 +1,317 @@
+name: Universal Build Matrix
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  detect-projects:
+    name: Detect Projects
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+      has-projects: ${{ steps.detect.outputs.has-projects }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Detect projects
+        id: detect
+        run: |
+          python scripts/universal-builder.py --detect-only > detection.log 2>&1
+          
+          # Create matrix from detected projects
+          if python -c "
+          import json
+          import sys
+          import subprocess
+          
+          # Run detection and parse output
+          result = subprocess.run([
+              'python', 'scripts/universal-builder.py', '--detect-only'
+          ], capture_output=True, text=True)
+          
+          projects = []
+          if result.returncode == 0:
+              lines = result.stdout.strip().split('\n')
+              for line in lines:
+                  if ' - ' in line and '(' in line and ')' in line:
+                      parts = line.strip().split(' - ')
+                      if len(parts) >= 2:
+                          name_lang = parts[1]
+                          if '(' in name_lang and ')' in name_lang:
+                              name = name_lang.split('(')[0].strip()
+                              lang = name_lang.split('(')[1].split(')')[0]
+                              projects.append({'name': name, 'language': lang})
+          
+          if projects:
+              matrix = {'include': projects}
+              print(f'matrix={json.dumps(matrix)}')
+              print('has-projects=true')
+          else:
+              print('matrix={\"include\": []}')
+              print('has-projects=false')
+          " >> $GITHUB_OUTPUT; then
+            echo "Project detection completed"
+          else
+            echo "matrix={\"include\": []}" >> $GITHUB_OUTPUT
+            echo "has-projects=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload detection log
+        uses: actions/upload-artifact@v3
+        with:
+          name: detection-log
+          path: detection.log
+
+  universal-build:
+    name: Build ${{ matrix.name }} (${{ matrix.language }})
+    needs: detect-projects
+    if: needs.detect-projects.outputs.has-projects == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        ${{ fromJson(needs.detect-projects.outputs.matrix) }}
+        exclude:
+          # Exclude some combinations to reduce job count
+          - os: windows-latest
+            language: shell
+          - os: macos-latest
+            language: shell
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Language-specific setup
+      - name: Set up Node.js
+        if: matrix.language == 'javascript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up Python
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+          cache-dependency-path: go.sum
+
+      - name: Set up Rust
+        if: matrix.language == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Set up Java
+        if: matrix.language == 'java' || matrix.language == 'kotlin' || matrix.language == 'scala'
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up .NET
+        if: matrix.language == 'csharp'
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0'
+
+      - name: Set up Ruby
+        if: matrix.language == 'ruby'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Set up PHP
+        if: matrix.language == 'php'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, xml, zip
+          tools: composer
+
+      - name: Set up Swift
+        if: matrix.language == 'swift' && runner.os == 'macOS'
+        run: |
+          echo "Swift is pre-installed on macOS runners"
+
+      - name: Set up C/C++
+        if: matrix.language == 'c' || matrix.language == 'cpp'
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential cmake
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install cmake
+          fi
+
+      # Universal build setup
+      - name: Install universal builder dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Run universal build
+        run: |
+          python scripts/universal-builder.py \
+            --operations install lint test build package
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-results-${{ matrix.name }}-${{ matrix.os }}
+          path: |
+            build-results-*.json
+            build.log
+            **/target/
+            **/dist/
+            **/build/
+            **/*.jar
+            **/*.war
+            **/*.whl
+            **/*.gem
+            **/*.nupkg
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: detect-projects
+    if: needs.detect-projects.outputs.has-projects == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Generate SBOM with Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft . -o spdx-json=sbom.spdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: software-bill-of-materials
+          path: sbom.spdx.json
+
+  compliance-check:
+    name: Compliance & License Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: License scan with FOSSA
+        if: env.FOSSA_API_KEY != ''
+        run: |
+          curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/fossa-cli/master/install-latest.sh | bash
+          fossa analyze
+          fossa test
+        env:
+          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+
+      - name: Check for secrets with GitLeaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  documentation:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    needs: universal-build
+    if: always() && needs.detect-projects.outputs.has-projects == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Generate documentation
+        run: |
+          # Install documentation tools
+          pip install sphinx mkdocs-material pydoc-markdown
+          
+          # Create documentation
+          mkdir -p docs/build-reports
+          
+          # Download build artifacts
+          echo "# Universal Build Report" > docs/build-reports/README.md
+          echo "" >> docs/build-reports/README.md
+          echo "Generated on: $(date)" >> docs/build-reports/README.md
+          echo "" >> docs/build-reports/README.md
+
+      - name: Deploy documentation
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+
+  notification:
+    name: Build Notification
+    runs-on: ubuntu-latest
+    needs: [detect-projects, universal-build, security-scan, compliance-check]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.universal-build.result == 'success'
+        run: |
+          echo "✅ Universal build completed successfully!"
+          echo "All projects built and tested across multiple platforms."
+
+      - name: Notify on failure
+        if: needs.universal-build.result == 'failure'
+        run: |
+          echo "❌ Universal build failed!"
+          echo "Check the logs for detailed error information."
+          exit 1
+
+      - name: Create build summary
+        run: |
+          echo "## Universal Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Projects detected**: ${{ needs.detect-projects.outputs.has-projects == 'true' && 'Yes' || 'No' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build status**: ${{ needs.universal-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security scan**: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Compliance check**: ${{ needs.compliance-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed logs and artifacts in the Actions tab." >> $GITHUB_STEP_SUMMARY
