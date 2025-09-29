@@ -1,0 +1,51 @@
+{
+  "build_id": "build-1759125229",
+  "timestamp": "2025-09-29T05:53:49.650062",
+  "projects": [
+    {
+      "name": "scripts",
+      "path": "scripts",
+      "language": "python",
+      "operations": {
+        "install": {
+          "success": false,
+          "command": "pip install -r requirements.txt || poetry install || pipenv install",
+          "stdout": "",
+          "stderr": "/bin/sh: 1: pipenv: not found\n",
+          "return_code": 127
+        },
+        "test": {
+          "success": false,
+          "command": "python -m pytest || python -m unittest discover",
+          "stdout": "",
+          "stderr": "\n----------------------------------------------------------------------\nRan 0 tests in 0.000s\n\nNO TESTS RAN\n",
+          "return_code": 5
+        }
+      },
+      "status": "failed",
+      "duration": 0.5756862163543701,
+      "artifacts": []
+    }
+  ],
+  "summary": {
+    "total_projects": 1,
+    "successful_projects": 0,
+    "failed_projects": 1,
+    "error_projects": 0,
+    "success_rate": 0.0,
+    "language_stats": {
+      "python": {
+        "total": 1,
+        "success": 0,
+        "failed": 1
+      }
+    },
+    "total_duration": 0.5756862163543701
+  },
+  "errors": [
+    {
+      "project": "src",
+      "error": "[Errno 2] No such file or directory: 'src'"
+    }
+  ]
+}

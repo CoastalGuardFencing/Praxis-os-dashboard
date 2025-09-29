@@ -1,0 +1,433 @@
+# Universal Language Configuration
+# This file defines build, test, lint, and package commands for all supported languages
+
+languages:
+  javascript:
+    name: "JavaScript/Node.js"
+    file_patterns:
+      - "*.js"
+      - "*.jsx"
+      - "*.ts"
+      - "*.tsx"
+    project_files:
+      - "package.json"
+      - "yarn.lock"
+      - "package-lock.json"
+    commands:
+      install: "npm install"
+      build: "npm run build"
+      test: "npm test"
+      lint: "npm run lint || npx eslint . --ext .js,.jsx,.ts,.tsx"
+      format: "npm run format || npx prettier --write ."
+      minify: "npm run minify || npx terser"
+      package: "npm pack"
+      clean: "rm -rf node_modules dist build"
+    docker_base: "node:18-alpine"
+    registry: "npm"
+
+  python:
+    name: "Python"
+    file_patterns:
+      - "*.py"
+      - "*.pyx"
+    project_files:
+      - "setup.py"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - "Pipfile"
+      - "poetry.lock"
+    commands:
+      install: "pip install -r requirements.txt || poetry install || pipenv install"
+      build: "python setup.py build || poetry build"
+      test: "python -m pytest || python -m unittest discover"
+      lint: "flake8 . || pylint ."
+      format: "black . || autopep8 --in-place --recursive ."
+      package: "python setup.py sdist bdist_wheel || poetry build"
+      clean: "rm -rf build dist __pycache__ .pytest_cache"
+    docker_base: "python:3.11-slim"
+    registry: "pypi"
+
+  go:
+    name: "Go"
+    file_patterns:
+      - "*.go"
+    project_files:
+      - "go.mod"
+      - "go.sum"
+    commands:
+      install: "go mod download"
+      build: "go build ./..."
+      test: "go test ./..."
+      lint: "golangci-lint run || go vet ./..."
+      format: "gofmt -w . && goimports -w ."
+      package: "go build -o bin/"
+      clean: "go clean -cache -modcache -testcache"
+    docker_base: "golang:1.21-alpine"
+    registry: "go"
+
+  rust:
+    name: "Rust"
+    file_patterns:
+      - "*.rs"
+    project_files:
+      - "Cargo.toml"
+      - "Cargo.lock"
+    commands:
+      install: "cargo fetch"
+      build: "cargo build --release"
+      test: "cargo test"
+      lint: "cargo clippy -- -D warnings"
+      format: "cargo fmt"
+      package: "cargo package"
+      clean: "cargo clean"
+    docker_base: "rust:1.75-slim"
+    registry: "crates.io"
+
+  java:
+    name: "Java"
+    file_patterns:
+      - "*.java"
+    project_files:
+      - "pom.xml"
+      - "build.gradle"
+      - "build.gradle.kts"
+    commands:
+      install: "mvn dependency:resolve || gradle dependencies"
+      build: "mvn compile || gradle build"
+      test: "mvn test || gradle test"
+      lint: "mvn checkstyle:check || gradle checkstyleMain"
+      format: "mvn formatter:format || gradle googleJavaFormat"
+      package: "mvn package || gradle jar"
+      clean: "mvn clean || gradle clean"
+    docker_base: "openjdk:17-jdk-slim"
+    registry: "maven"
+
+  csharp:
+    name: "C#/.NET"
+    file_patterns:
+      - "*.cs"
+    project_files:
+      - "*.csproj"
+      - "*.sln"
+      - "project.json"
+    commands:
+      install: "dotnet restore"
+      build: "dotnet build"
+      test: "dotnet test"
+      lint: "dotnet format --verify-no-changes"
+      format: "dotnet format"
+      package: "dotnet pack"
+      clean: "dotnet clean"
+    docker_base: "mcr.microsoft.com/dotnet/sdk:8.0"
+    registry: "nuget"
+
+  ruby:
+    name: "Ruby"
+    file_patterns:
+      - "*.rb"
+    project_files:
+      - "Gemfile"
+      - "Gemfile.lock"
+      - "*.gemspec"
+    commands:
+      install: "bundle install"
+      build: "bundle exec rake build || gem build *.gemspec"
+      test: "bundle exec rspec || bundle exec rake test"
+      lint: "rubocop"
+      format: "rubocop -a"
+      package: "gem build *.gemspec"
+      clean: "bundle exec rake clean"
+    docker_base: "ruby:3.2-slim"
+    registry: "rubygems"
+
+  php:
+    name: "PHP"
+    file_patterns:
+      - "*.php"
+    project_files:
+      - "composer.json"
+      - "composer.lock"
+    commands:
+      install: "composer install"
+      build: "composer dump-autoload"
+      test: "vendor/bin/phpunit || php artisan test"
+      lint: "vendor/bin/phpcs || php -l"
+      format: "vendor/bin/phpcbf"
+      package: "composer archive"
+      clean: "rm -rf vendor"
+    docker_base: "php:8.2-cli"
+    registry: "packagist"
+
+  swift:
+    name: "Swift"
+    file_patterns:
+      - "*.swift"
+    project_files:
+      - "Package.swift"
+      - "*.xcodeproj"
+      - "*.xcworkspace"
+    commands:
+      install: "swift package resolve"
+      build: "swift build || xcodebuild"
+      test: "swift test || xcodebuild test"
+      lint: "swiftlint"
+      format: "swiftformat ."
+      package: "swift package archive-source"
+      clean: "swift package clean"
+    docker_base: "swift:5.9"
+    registry: "swift"
+
+  kotlin:
+    name: "Kotlin"
+    file_patterns:
+      - "*.kt"
+      - "*.kts"
+    project_files:
+      - "build.gradle.kts"
+      - "pom.xml"
+    commands:
+      install: "gradle dependencies || mvn dependency:resolve"
+      build: "gradle build || mvn compile"
+      test: "gradle test || mvn test"
+      lint: "gradle ktlintCheck"
+      format: "gradle ktlintFormat"
+      package: "gradle jar || mvn package"
+      clean: "gradle clean || mvn clean"
+    docker_base: "openjdk:17-jdk-slim"
+    registry: "maven"
+
+  cpp:
+    name: "C++"
+    file_patterns:
+      - "*.cpp"
+      - "*.cc"
+      - "*.cxx"
+      - "*.hpp"
+      - "*.h"
+    project_files:
+      - "CMakeLists.txt"
+      - "Makefile"
+      - "conanfile.txt"
+    commands:
+      install: "conan install . || vcpkg install"
+      build: "cmake --build . || make"
+      test: "ctest || make test"
+      lint: "clang-tidy src/*.cpp"
+      format: "clang-format -i src/*.cpp src/*.hpp"
+      package: "cpack"
+      clean: "make clean || rm -rf build"
+    docker_base: "gcc:latest"
+    registry: "conan"
+
+  c:
+    name: "C"
+    file_patterns:
+      - "*.c"
+      - "*.h"
+    project_files:
+      - "Makefile"
+      - "CMakeLists.txt"
+    commands:
+      install: "# No standard package manager"
+      build: "make || gcc -o main *.c"
+      test: "make test || ./test"
+      lint: "cppcheck ."
+      format: "clang-format -i *.c *.h"
+      package: "make package"
+      clean: "make clean"
+    docker_base: "gcc:latest"
+    registry: "manual"
+
+  scala:
+    name: "Scala"
+    file_patterns:
+      - "*.scala"
+    project_files:
+      - "build.sbt"
+      - "pom.xml"
+    commands:
+      install: "sbt update || mvn dependency:resolve"
+      build: "sbt compile || mvn compile"
+      test: "sbt test || mvn test"
+      lint: "sbt scalafix --check"
+      format: "sbt scalafmt"
+      package: "sbt package || mvn package"
+      clean: "sbt clean || mvn clean"
+    docker_base: "openjdk:17-jdk-slim"
+    registry: "maven"
+
+  dart:
+    name: "Dart/Flutter"
+    file_patterns:
+      - "*.dart"
+    project_files:
+      - "pubspec.yaml"
+      - "pubspec.lock"
+    commands:
+      install: "dart pub get || flutter pub get"
+      build: "dart compile exe . || flutter build"
+      test: "dart test || flutter test"
+      lint: "dart analyze"
+      format: "dart format ."
+      package: "dart pub publish --dry-run"
+      clean: "dart pub deps || flutter clean"
+    docker_base: "dart:stable"
+    registry: "pub.dev"
+
+  elixir:
+    name: "Elixir"
+    file_patterns:
+      - "*.ex"
+      - "*.exs"
+    project_files:
+      - "mix.exs"
+      - "mix.lock"
+    commands:
+      install: "mix deps.get"
+      build: "mix compile"
+      test: "mix test"
+      lint: "mix credo"
+      format: "mix format"
+      package: "mix hex.build"
+      clean: "mix clean"
+    docker_base: "elixir:1.15"
+    registry: "hex"
+
+  shell:
+    name: "Shell Script"
+    file_patterns:
+      - "*.sh"
+      - "*.bash"
+      - "*.zsh"
+    project_files: []
+    commands:
+      install: "# No package manager"
+      build: "chmod +x *.sh"
+      test: "shellcheck *.sh || bats test/"
+      lint: "shellcheck *.sh"
+      format: "shfmt -w *.sh"
+      package: "tar -czf scripts.tar.gz *.sh"
+      clean: "# No cleanup needed"
+    docker_base: "alpine:latest"
+    registry: "manual"
+
+  r:
+    name: "R"
+    file_patterns:
+      - "*.R"
+      - "*.Rmd"
+    project_files:
+      - "DESCRIPTION"
+      - "NAMESPACE"
+    commands:
+      install: "Rscript -e 'install.packages(\"devtools\")'"
+      build: "R CMD build ."
+      test: "Rscript -e 'devtools::test()'"
+      lint: "Rscript -e 'lintr::lint_package()'"
+      format: "Rscript -e 'styler::style_pkg()'"
+      package: "R CMD build ."
+      clean: "rm -rf .Rcheck"
+    docker_base: "r-base:latest"
+    registry: "cran"
+
+  perl:
+    name: "Perl"
+    file_patterns:
+      - "*.pl"
+      - "*.pm"
+    project_files:
+      - "Makefile.PL"
+      - "Build.PL"
+      - "cpanfile"
+    commands:
+      install: "cpanm --installdeps ."
+      build: "perl Makefile.PL && make"
+      test: "make test"
+      lint: "perlcritic ."
+      format: "perltidy -b *.pl *.pm"
+      package: "make dist"
+      clean: "make clean"
+    docker_base: "perl:latest"
+    registry: "cpan"
+
+  haskell:
+    name: "Haskell"
+    file_patterns:
+      - "*.hs"
+      - "*.lhs"
+    project_files:
+      - "*.cabal"
+      - "stack.yaml"
+    commands:
+      install: "stack build --dependencies-only || cabal install --dependencies-only"
+      build: "stack build || cabal build"
+      test: "stack test || cabal test"
+      lint: "hlint ."
+      format: "ormolu --mode inplace *.hs"
+      package: "stack sdist || cabal sdist"
+      clean: "stack clean || cabal clean"
+    docker_base: "haskell:latest"
+    registry: "hackage"
+
+  julia:
+    name: "Julia"
+    file_patterns:
+      - "*.jl"
+    project_files:
+      - "Project.toml"
+      - "Manifest.toml"
+    commands:
+      install: "julia --project -e 'using Pkg; Pkg.instantiate()'"
+      build: "julia --project -e 'using Pkg; Pkg.build()'"
+      test: "julia --project -e 'using Pkg; Pkg.test()'"
+      lint: "julia --project -e 'using JuliaFormatter; format(\".\")"
+      format: "julia --project -e 'using JuliaFormatter; format(\".\")"
+      package: "julia --project -e 'using Pkg; Pkg.build()'"
+      clean: "julia --project -e 'using Pkg; Pkg.gc()'"
+    docker_base: "julia:latest"
+    registry: "general"
+
+  clojure:
+    name: "Clojure"
+    file_patterns:
+      - "*.clj"
+      - "*.cljs"
+      - "*.cljc"
+    project_files:
+      - "project.clj"
+      - "deps.edn"
+    commands:
+      install: "lein deps || clojure -P"
+      build: "lein compile || clojure -M:build"
+      test: "lein test || clojure -M:test"
+      lint: "lein kibit || clj-kondo --lint src"
+      format: "lein cljfmt fix || cljstyle fix"
+      package: "lein jar || clojure -M:jar"
+      clean: "lein clean"
+    docker_base: "clojure:openjdk-17"
+    registry: "clojars"
+
+# Global settings
+global:
+  parallel_builds: true
+  max_parallel: 4
+  timeout: 1800  # 30 minutes
+  retry_count: 2
+  cache_enabled: true
+  
+# Build matrix configuration
+matrix:
+  os:
+    - "ubuntu-latest"
+    - "windows-latest"
+    - "macos-latest"
+  node_version:
+    - "18"
+    - "20"
+  python_version:
+    - "3.9"
+    - "3.10"
+    - "3.11"
+  go_version:
+    - "1.20"
+    - "1.21"

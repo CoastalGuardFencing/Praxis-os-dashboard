@@ -1,0 +1,293 @@
+# Deployment Configuration
+# Defines environments, strategies, and deployment settings
+
+environments:
+  development:
+    type: "kubernetes"
+    namespace: "dev"
+    replicas: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"
+    health_check:
+      path: "/health"
+      port: 8080
+      initial_delay: 30
+      timeout: 10
+    
+  staging:
+    type: "kubernetes"
+    namespace: "staging"
+    replicas: 2
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    health_check:
+      path: "/health"
+      port: 8080
+      initial_delay: 30
+      timeout: 10
+    ingress:
+      enabled: true
+      host: "staging.example.com"
+      tls: true
+    
+  production:
+    type: "kubernetes"
+    namespace: "production"
+    replicas: 5
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    health_check:
+      path: "/health"
+      port: 8080
+      initial_delay: 60
+      timeout: 15
+    ingress:
+      enabled: true
+      host: "api.example.com"
+      tls: true
+    autoscaling:
+      enabled: true
+      min_replicas: 5
+      max_replicas: 20
+      target_cpu: 70
+    monitoring:
+      enabled: true
+      alerts:
+        - type: "error_rate"
+          threshold: 0.01
+        - type: "response_time"
+          threshold: 500
+
+strategies:
+  blue-green:
+    description: "Blue-Green deployment with full environment switch"
+    health_check_interval: 30
+    health_check_timeout: 300
+    rollback_threshold: 0.05
+    switch_traffic_delay: 60
+    cleanup_delay: 300
+    validation_tests:
+      - smoke_tests
+      - integration_tests
+    
+  canary:
+    description: "Gradual traffic shift to new version"
+    initial_traffic: 5
+    traffic_increment: 15
+    increment_interval: 300
+    max_increment_interval: 600
+    success_threshold: 0.995
+    error_threshold: 0.01
+    response_time_threshold: 500
+    rollback_on_failure: true
+    validation_tests:
+      - smoke_tests
+    traffic_stages:
+      - percentage: 5
+        duration: 300
+        success_threshold: 0.99
+      - percentage: 20
+        duration: 600
+        success_threshold: 0.995
+      - percentage: 50
+        duration: 900
+        success_threshold: 0.997
+      - percentage: 100
+        duration: 0
+        success_threshold: 0.995
+    
+  rolling:
+    description: "Rolling update with pod replacement"
+    max_unavailable: "25%"
+    max_surge: "25%"
+    rollout_timeout: 600
+    revision_history_limit: 10
+    progress_deadline: 600
+
+# Cloud providers configuration
+cloud_providers:
+  aws:
+    enabled: false
+    region: "us-west-2"
+    ecr_registry: "123456789012.dkr.ecr.us-west-2.amazonaws.com"
+    eks_cluster: "production-cluster"
+    s3_artifacts_bucket: "build-artifacts"
+    
+  gcp:
+    enabled: false
+    project_id: "my-project-id"
+    region: "us-central1"
+    gcr_registry: "gcr.io/my-project-id"
+    gke_cluster: "production-cluster"
+    gcs_artifacts_bucket: "build-artifacts"
+    
+  azure:
+    enabled: false
+    subscription_id: "subscription-id"
+    resource_group: "production-rg"
+    acr_registry: "myregistry.azurecr.io"
+    aks_cluster: "production-cluster"
+    storage_account: "buildartifacts"
+
+# Monitoring and observability
+monitoring:
+  prometheus:
+    enabled: true
+    namespace: "monitoring"
+    scrape_interval: "15s"
+    metrics:
+      - "http_requests_total"
+      - "http_request_duration_seconds"
+      - "http_request_size_bytes"
+      - "http_response_size_bytes"
+  
+  grafana:
+    enabled: true
+    namespace: "monitoring"
+    dashboards:
+      - "application-overview"
+      - "deployment-metrics"
+      - "infrastructure-metrics"
+  
+  jaeger:
+    enabled: true
+    namespace: "monitoring"
+    sampling_rate: 0.1
+  
+  datadog:
+    enabled: false
+    api_key_secret: "datadog-api-key"
+    app_key_secret: "datadog-app-key"
+
+# Security and compliance
+security:
+  image_scanning:
+    enabled: true
+    registries:
+      - "docker.io"
+      - "gcr.io"
+      - "123456789012.dkr.ecr.us-west-2.amazonaws.com"
+    vulnerability_threshold: "HIGH"
+    
+  network_policies:
+    enabled: true
+    default_deny: true
+    
+  pod_security:
+    enabled: true
+    enforce_non_root: true
+    readonly_filesystem: true
+    drop_capabilities: ["ALL"]
+    
+  secrets_management:
+    provider: "kubernetes"  # or "vault", "aws-secrets-manager", etc.
+    rotation_enabled: true
+    rotation_interval: "90d"
+
+# Rollback configuration
+rollback:
+  automatic: true
+  conditions:
+    - metric: "error_rate"
+      threshold: 0.05
+      duration: "5m"
+    - metric: "response_time_p95"
+      threshold: 1000
+      duration: "3m"
+    - metric: "pod_restart_rate"
+      threshold: 0.1
+      duration: "2m"
+  
+  manual_approval_required: false
+  notification_channels:
+    - "slack"
+    - "email"
+    - "pagerduty"
+
+# Notification configuration
+notifications:
+  slack:
+    enabled: true
+    webhook_url_secret: "slack-webhook-url"
+    channels:
+      - "#deployments"
+      - "#alerts"
+    events:
+      - "deployment_started"
+      - "deployment_completed"
+      - "deployment_failed"
+      - "rollback_initiated"
+  
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    smtp_port: 587
+    from_address: "deployments@example.com"
+    recipients:
+      - "team@example.com"
+  
+  pagerduty:
+    enabled: false
+    integration_key_secret: "pagerduty-integration-key"
+    events:
+      - "deployment_failed"
+      - "rollback_initiated"
+
+# Testing configuration
+testing:
+  smoke_tests:
+    enabled: true
+    timeout: 120
+    endpoint: "/health"
+    expected_status: 200
+    
+  integration_tests:
+    enabled: true
+    timeout: 300
+    command: "npm run test:integration"
+    
+  load_tests:
+    enabled: false
+    tool: "k6"
+    script: "scripts/load-test.js"
+    duration: "5m"
+    users: 100
+
+# Feature flags
+feature_flags:
+  provider: "launchdarkly"  # or "split", "flagsmith", etc.
+  enabled: true
+  config_secret: "feature-flags-config"
+  
+# Database migrations
+database:
+  migrations:
+    enabled: true
+    pre_deploy: true
+    post_deploy: false
+    rollback_support: true
+    timeout: 600
+    
+# Cache warming
+cache:
+  warming:
+    enabled: true
+    endpoints:
+      - "/api/health"
+      - "/api/config"
+    delay_after_deploy: 30
